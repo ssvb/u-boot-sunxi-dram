@@ -162,6 +162,15 @@
 #undef CONFIG_CMD_NET
 #undef CONFIG_CMD_NFS
 
+/* I2C */
+#define CONFIG_SPL_I2C_SUPPORT
+/* No CONFIG_SYS_I2C as we use the non converted mvtwsi driver */
+#define CONFIG_HARD_I2C
+#define CONFIG_SYS_I2C_SUNXI
+#define CONFIG_SYS_I2C_SPEED		400000
+#define CONFIG_SYS_I2C_SLAVE		0x7f
+#define CONFIG_CMD_I2C
+
 #define CONFIG_CONS_INDEX              1       /* UART0 */
 
 #ifdef CONFIG_SUNXI_GMAC
