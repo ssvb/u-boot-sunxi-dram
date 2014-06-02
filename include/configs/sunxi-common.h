@@ -18,9 +18,7 @@
  */
 #define CONFIG_SUNXI		/* sunxi family */
 #ifdef CONFIG_SPL_BUILD
-#ifndef CONFIG_SPL_FEL
 #define CONFIG_SYS_THUMB_BUILD	/* Thumbs mode to save space in SPL */
-#endif
 #endif
 
 #include <asm/arch/cpu.h>	/* get chip and board defs */

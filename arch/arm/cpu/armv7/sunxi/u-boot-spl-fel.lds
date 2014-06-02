@@ -6,7 +6,7 @@
  */
 OUTPUT_FORMAT("elf32-littlearm", "elf32-littlearm", "elf32-littlearm")
 OUTPUT_ARCH(arm)
-ENTRY(s_init)
+ENTRY(_start_fel)
 SECTIONS
 {
 	. = 0x00002000;
@@ -14,7 +14,7 @@ SECTIONS
 	. = ALIGN(4);
 	.text :
 	{
-		*(.text.s_init)
+		arch/arm/cpu/armv7/sunxi/start_fel.o	(.text)
 		*(.text*)
 	}
 

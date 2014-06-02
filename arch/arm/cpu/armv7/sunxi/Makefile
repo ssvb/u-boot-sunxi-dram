@@ -21,5 +21,6 @@ ifdef CONFIG_SPL_BUILD
 obj-$(CONFIG_SUN7I)	+= dram.o
 ifdef CONFIG_SPL_FEL
 obj-y	+= start.o
+extra-y += start_fel.o
 endif
 endif
