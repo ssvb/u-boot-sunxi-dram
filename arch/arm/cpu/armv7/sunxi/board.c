@@ -69,6 +69,18 @@ void s_init(void)
 		"mcr p15, 0, r0, c1, c0, 1\n");
 #endif
 
+#if defined(CONFIG_SPL_FEL) && (defined(CONFIG_SUN4I) || defined(CONFIG_SUN5I))
+	/* For ARM Cortex-A8 based hardware (sun4i and sun5i), the L2EN bit is
+	 * set by the BROM code in the "normal" mode, but not in the "FEL" mode.
+	 * Here we fix this inconsistency in the Auxiliary Ctl reg by also
+	 * setting the missing L2EN bit.
+	 */
+	asm volatile(
+		"mrc p15, 0, r0, c1, c0, 1\n"
+		"orr r0, r0, #2\n"
+		"mcr p15, 0, r0, c1, c0, 1\n" : : : "r0");
+#endif
+
 	clock_init();
 	timer_init();
 	gpio_init();
