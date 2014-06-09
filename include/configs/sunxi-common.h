@@ -284,7 +284,9 @@
 #define CONFIG_SPL_POWER_SUPPORT
 #endif
 
+#ifndef CONFIG_CONS_INDEX
 #define CONFIG_CONS_INDEX              1       /* UART0 */
+#endif
 
 #ifdef CONFIG_SUNXI_GMAC
 #define CONFIG_DESIGNWARE_ETH		/* GMAC can use designware driver */
