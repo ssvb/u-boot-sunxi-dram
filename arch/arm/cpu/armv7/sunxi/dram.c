@@ -318,6 +318,41 @@ static void mctl_disable_power_save(void)
 	writel(0x16510000, &dram->ppwrsctl);
 }
 
+/*
+ * After the DRAM is powered up or reset, the DDR3 spec requires to wait at
+ * least 500 us before driving the CKE pin (Clock Enable) high. The dram->idct
+ * (SDR_IDCR) register appears to configure this delay, which gets applied
+ * right at the time when the DRAM initialization is activated in the
+ * 'mctl_ddr3_initialize' function.
+ */
+static void mctl_set_cke_delay(void)
+{
+	struct sunxi_dram_reg *dram = (struct sunxi_dram_reg *)SUNXI_DRAMC_BASE;
+
+	/* The CKE delay is represented in dram clock cycles, multiplied by N
+	 * (where N=2 for sun4i/sun5i and N=3 for sun7i). We are being lazy
+	 * to do proper calculations and just set it to the maximum possible
+	 * value 0x1ffff. This is enough to provide the needed 500 us delay
+	 * at the DRAM clock freqencies up to ~524MHz on sun4i/sun5i hardware.
+	 * The sun7i hardware has even more headroom due to a larger multiplier.
+	 */
+	setbits_le32(&dram->idcr, 0x1ffff);
+}
+
+/*
+ * This triggers the DRAM initialization. It performs sending the mode registers
+ * to the DRAM among other things. Very likely the ZQCL command is also getting
+ * executed (to do the initial impedance calibration on the DRAM side of the
+ * wire). The memory controller and the PHY must be already configured before
+ * calling this function.
+ */
+static void mctl_ddr3_initialize(void)
+{
+	struct sunxi_dram_reg *dram = (struct sunxi_dram_reg *)SUNXI_DRAMC_BASE;
+	setbits_le32(&dram->ccr, DRAM_CCR_INIT);
+	await_completion(&dram->ccr, DRAM_CCR_INIT);
+}
+
 unsigned long dramc_init(struct dram_para *para)
 {
 	struct sunxi_dram_reg *dram = (struct sunxi_dram_reg *)SUNXI_DRAMC_BASE;
@@ -387,10 +422,7 @@ unsigned long dramc_init(struct dram_para *para)
 	writel(reg_val, &dram->zqcr0);
 #endif
 
-#ifdef CONFIG_SUN7I
-	/* Set CKE Delay to about 1ms */
-	setbits_le32(&dram->idcr, 0x1ffff);
-#endif
+	mctl_set_cke_delay();
 
 	mctl_ddr3_reset();
 
@@ -434,9 +466,8 @@ unsigned long dramc_init(struct dram_para *para)
 	if (para->tpr4 & 0x1)
 		setbits_le32(&dram->ccr, DRAM_CCR_COMMAND_RATE_1T);
 #endif
-	/* reset external DRAM */
-	setbits_le32(&dram->ccr, DRAM_CCR_INIT);
-	await_completion(&dram->ccr, DRAM_CCR_INIT);
+	/* initialize external DRAM */
+	mctl_ddr3_initialize();
 
 	/* scan read pipe value */
 	mctl_itm_enable();
