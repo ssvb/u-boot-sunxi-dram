@@ -49,6 +49,19 @@ static void await_completion(u32 *reg, u32 mask)
 }
 
 /*
+ * Wait up to 1s for mask to be set in given reg.
+ */
+static void await_bits_set(u32 *reg, u32 mask)
+{
+	unsigned long tmo = timer_get_us() + 1000000;
+
+	while ((readl(reg) & mask) != mask) {
+		if (timer_get_us() > tmo)
+			panic("Timeout initialising DRAM\n");
+	}
+}
+
+/*
  * This performs the external DRAM reset by driving the RESET pin low and
  * then high again. According to the DDR3 spec, the RESET pin needs to be
  * kept low for at least 200 us.
@@ -353,6 +366,51 @@ static void mctl_ddr3_initialize(void)
 	await_completion(&dram->ccr, DRAM_CCR_INIT);
 }
 
+/*
+ * Perform impedance calibration on the DRAM controller side of the wire.
+ */
+static void mctl_set_impedance(u32 zq, u32 odt_en)
+{
+	struct sunxi_dram_reg *dram = (struct sunxi_dram_reg *)SUNXI_DRAMC_BASE;
+	u32 reg_val;
+	u32 zprog = zq & 0xFF, zdata = (zq >> 8) & 0xFFFFF;
+
+#ifndef CONFIG_SUN7I
+	/* wait for the default impedance configuration to settle */
+	await_bits_set(&dram->zqsr, DRAM_ZQSR_ZDONE);
+#endif
+
+	if (!odt_en)
+		return;
+
+#ifdef CONFIG_SUN7I
+	/* some weird magic, but sun7i fails to boot without it */
+	writel((1 << 24) | (1 << 1), &dram->zqcr1);
+#endif
+
+	/* needed at least for sun5i, because it does not self clear there */
+	clrbits_le32(&dram->zqcr0, DRAM_ZQCR0_ZCAL);
+
+	if (zdata) {
+		/* set the user supplied impedance data */
+		reg_val = DRAM_ZQCR0_ZDEN | zdata;
+		writel(reg_val, &dram->zqcr0);
+		/* no need to wait, this takes effect immediately */
+	} else {
+		/* do the calibration using the external resistor */
+		reg_val = DRAM_ZQCR0_ZCAL | DRAM_ZQCR0_IMP_DIV(zprog);
+		writel(reg_val, &dram->zqcr0);
+		/* wait for the new impedance configuration to settle */
+		await_bits_set(&dram->zqsr, DRAM_ZQSR_ZDONE);
+	}
+
+	/* needed at least for sun5i, because it does not self clear there */
+	clrbits_le32(&dram->zqcr0, DRAM_ZQCR0_ZCAL);
+
+	/* set I/O configure register */
+	writel(DRAM_IOCR_ODT_EN(odt_en), &dram->iocr);
+}
+
 unsigned long dramc_init(struct dram_para *para)
 {
 	struct sunxi_dram_reg *dram = (struct sunxi_dram_reg *)SUNXI_DRAMC_BASE;
@@ -407,20 +465,9 @@ unsigned long dramc_init(struct dram_para *para)
 	reg_val |= DRAM_DCR_MODE(DRAM_DCR_MODE_INTERLEAVE);
 	writel(reg_val, &dram->dcr);
 
-#ifdef CONFIG_SUN7I
-	setbits_le32(&dram->zqcr1, (0x1 << 24) | (0x1 << 1));
-	if (para->tpr4 & 0x2)
-		clrsetbits_le32(&dram->zqcr1, (0x1 << 24), (0x1 << 1));
 	dramc_clock_output_en(1);
-#endif
 
-#if (defined(CONFIG_SUN5I) || defined(CONFIG_SUN7I))
-	/* set odt impendance divide ratio */
-	reg_val = ((para->zq) >> 8) & 0xfffff;
-	reg_val |= ((para->zq) & 0xff) << 20;
-	reg_val |= (para->zq) & 0xf0000000;
-	writel(reg_val, &dram->zqcr0);
-#endif
+	mctl_set_impedance(para->zq, para->odt_en);
 
 	mctl_set_cke_delay();
 
