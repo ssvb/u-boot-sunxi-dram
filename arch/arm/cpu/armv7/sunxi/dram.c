@@ -71,9 +71,26 @@ static void mctl_ddr3_reset(void)
 	struct sunxi_dram_reg *dram =
 			(struct sunxi_dram_reg *)SUNXI_DRAMC_BASE;
 
-	clrbits_le32(&dram->mcr, DRAM_MCR_RESET);
-	udelay(200);
-	setbits_le32(&dram->mcr, DRAM_MCR_RESET);
+#ifdef CONFIG_SUN4I
+	struct sunxi_timer_reg *timer =
+			(struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
+	u32 reg_val;
+
+	writel(0, &timer->cpu_cfg);
+	reg_val = readl(&timer->cpu_cfg);
+
+	if ((reg_val & CPU_CFG_CHIP_VER_MASK) !=
+	    CPU_CFG_CHIP_VER(CPU_CFG_CHIP_REV_A)) {
+		setbits_le32(&dram->mcr, DRAM_MCR_RESET);
+		udelay(200);
+		clrbits_le32(&dram->mcr, DRAM_MCR_RESET);
+	} else
+#endif
+	{
+		clrbits_le32(&dram->mcr, DRAM_MCR_RESET);
+		udelay(200);
+		setbits_le32(&dram->mcr, DRAM_MCR_RESET);
+	}
 }
 
 static void mctl_set_drive(void)
@@ -168,6 +185,26 @@ static void mctl_enable_dllx(u32 phase)
 }
 
 static u32 hpcr_value[32] = {
+#ifdef CONFIG_SUN5I
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0x1031, 0x1031, 0x0735, 0x1035,
+	0x1035, 0x0731, 0x1031, 0,
+	0x0301, 0x0301, 0x0301, 0x0301,
+	0x0301, 0x0301, 0x0301, 0
+#endif
+#ifdef CONFIG_SUN4I
+	0x0301, 0x0301, 0x0301, 0x0301,
+	0x0301, 0x0301, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0x1031, 0x1031, 0x0735, 0x5031,
+	0x1035, 0x0731, 0x1031, 0x0735,
+	0x1035, 0x1031, 0x0731, 0x1035,
+	0x1031, 0x0301, 0x0301, 0x0731
+#endif
 #ifdef CONFIG_SUN7I
 	0x0301, 0x0301, 0x0301, 0x0301,
 	0x0301, 0x0301, 0x0301, 0x0301,
@@ -360,6 +397,13 @@ static void dramc_clock_output_en(u32 on)
 	else
 		clrbits_le32(&dram->mcr, DRAM_MCR_DCLK_OUT);
 #endif
+#ifdef CONFIG_SUN4I
+	struct sunxi_ccm_reg *ccm = (struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
+	if (on)
+		setbits_le32(&ccm->dram_clk_cfg, CCM_DRAM_CTRL_DCLK_OUT);
+	else
+		clrbits_le32(&ccm->dram_clk_cfg, CCM_DRAM_CTRL_DCLK_OUT);
+#endif
 }
 
 static const u16 tRFC_table[2][6] = {
@@ -501,6 +545,11 @@ unsigned long dramc_init(struct dram_para *para)
 
 	/* dram clock off */
 	dramc_clock_output_en(0);
+
+#ifdef CONFIG_SUN4I
+	/* select dram controller 1 */
+	writel(DRAM_CSEL_MAGIC, &dram->csel);
+#endif
 
 	mctl_itm_disable();
 	mctl_enable_dll0(para->tpr3);
