@@ -70,7 +70,6 @@
 #define CONFIG_CMD_MMC
 #define CONFIG_MMC_SUNXI
 #define CONFIG_MMC_SUNXI_SLOT		0
-#define CONFIG_MMC_SUNXI_USE_DMA
 #define CONFIG_ENV_IS_IN_MMC
 #define CONFIG_SYS_MMC_ENV_DEV		0	/* first detected MMC controller */
 
@@ -112,8 +111,116 @@
 #define CONFIG_ENV_OFFSET		(544 << 10) /* (8 + 24 + 512) KiB */
 #define CONFIG_ENV_SIZE			(128 << 10)	/* 128 KiB */
 
+#ifdef CONFIG_SPL_FEL
+#define RUN_BOOT_RAM	"run boot_ram;"
+#else
+#define RUN_BOOT_RAM	""
+#endif
+
+#define CONFIG_BOOTCOMMAND \
+	RUN_BOOT_RAM \
+	"if run loadbootenv; then " \
+	  "echo Loaded environment from ${bootenv};" \
+	  "env import -t ${scriptaddr} ${filesize};" \
+	"fi;" \
+	"if test -n \\\"${uenvcmd}\\\"; then " \
+	  "echo Running uenvcmd ...;" \
+	  "run uenvcmd;" \
+	"fi;" \
+	"if run loadbootscr; then "\
+	  "echo Jumping to ${bootscr};" \
+	  "source ${scriptaddr};" \
+	"fi;" \
+	"run autoboot;" \
+	""
+
+#ifdef CONFIG_CMD_WATCHDOG
+#define	RESET_WATCHDOG "watchdog 0"
+#else
+#define RESET_WATCHDOG "true"
+#endif
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
-	"bootm_size=0x10000000\0"
+	"bootm_size=0x10000000\0" \
+	"console=ttyS0,115200\0" \
+	"panicarg=panic=10\0" \
+	"extraargs=\0" \
+	"loglevel=8\0" \
+	"scriptaddr=0x44000000\0" \
+	"device=mmc\0" \
+	"partition=0:1\0" \
+	"setargs=" \
+	  "if test -z \\\\\"$root\\\\\"; then"\
+	    " if test \\\\\"$bootpath\\\\\" = \"/boot/\"; then"\
+	      " root=\"/dev/mmcblk0p1 rootwait\";"\
+	    " else" \
+	      " root=\"/dev/mmcblk0p2 rootwait\";"\
+	    " fi;"\
+	  " fi;"\
+	  " setenv bootargs console=${console} root=${root}" \
+	  " loglevel=${loglevel} ${panicarg} ${extraargs}" \
+	  "\0" \
+	"kernel=uImage\0" \
+	"bootenv=uEnv.txt\0" \
+	"bootscr=boot.scr\0" \
+	"script=script.bin\0" \
+	"loadbootscr=" \
+	  "fatload $device $partition $scriptaddr ${bootscr}" \
+	  " || " \
+	  "ext2load $device $partition $scriptaddr boot/${bootscr}" \
+	  " ||" \
+	  "ext2load $device $partition $scriptaddr ${bootscr}" \
+	  "\0" \
+	"loadbootenv=" \
+	  "fatload $device $partition $scriptaddr ${bootenv}" \
+	  " || " \
+	  "ext2load $device $partition $scriptaddr boot/${bootenv}" \
+	  " || " \
+	  "ext2load $device $partition $scriptaddr ${bootenv}" \
+	  "\0" \
+	"loadkernel=" \
+	  "if "\
+	    "bootpath=/boot/" \
+	    " && " \
+	    "ext2load $device $partition 0x43000000 ${bootpath}${script}" \
+	    " && " \
+	    "ext2load $device $partition 0x48000000 ${bootpath}${kernel}" \
+	  ";then true; elif " \
+	    "bootpath=/" \
+	    " && " \
+	    "fatload $device $partition 0x43000000 ${script}" \
+	    " && " \
+	    "fatload $device $partition 0x48000000 ${kernel}" \
+	  ";then true; elif " \
+	    "bootpath=/" \
+	    " && " \
+	    "ext2load $device $partition 0x43000000 ${bootpath}${script}" \
+	    " && " \
+	    "ext2load $device $partition 0x48000000 ${bootpath}${kernel}" \
+	  ";then true; else "\
+	    "false" \
+	  ";fi" \
+	  "\0" \
+	"autoboot=" \
+	  "run loadkernel" \
+	  " && " \
+	  "run setargs" \
+	  " && " \
+	  RESET_WATCHDOG \
+	  " && " \
+	  "bootm 0x48000000" \
+	  "\0" \
+	"boot_ram=" \
+	  "saved_stdout=$stdout;setenv stdout nc;"\
+	  "if iminfo 0x41000000; then" \
+	    " " RESET_WATCHDOG ";"\
+	    " setenv stdout $saved_stdout;" \
+	    " source 0x41000000;" \
+	  "else" \
+	    " setenv stdout $saved_stdout;" \
+	  "fi" \
+	  "\0" \
+	""
 
 #define CONFIG_SYS_BOOT_GET_CMDLINE
 
@@ -162,7 +269,23 @@
 #undef CONFIG_CMD_NET
 #undef CONFIG_CMD_NFS
 
+/* I2C */
+#define CONFIG_SPL_I2C_SUPPORT
+/* No CONFIG_SYS_I2C as we use the non converted mvtwsi driver */
+#define CONFIG_HARD_I2C
+#define CONFIG_SYS_I2C_SUNXI
+#define CONFIG_SYS_I2C_SPEED		400000
+#define CONFIG_SYS_I2C_SLAVE		0x7f
+#define CONFIG_CMD_I2C
+
+/* PMU */
+#if defined CONFIG_AXP152_POWER || defined CONFIG_AXP209_POWER || defined CONFIG_AXP221_POWER
+#define CONFIG_SPL_POWER_SUPPORT
+#endif
+
+#ifndef CONFIG_CONS_INDEX
 #define CONFIG_CONS_INDEX              1       /* UART0 */
+#endif
 
 #ifdef CONFIG_SUNXI_GMAC
 #define CONFIG_DESIGNWARE_ETH		/* GMAC can use designware driver */
