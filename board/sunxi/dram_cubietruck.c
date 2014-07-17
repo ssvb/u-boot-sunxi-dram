@@ -3,26 +3,28 @@
 #include <common.h>
 #include <asm/arch/dram.h>
 
-static struct dram_para dram_para = {
-	.clock = 432,
-	.type = 3,
-	.rank_num = 1,
-	.density = 4096,
-	.io_width = 8,
-	.bus_width = 32,
-	.cas = 9,
-	.zq = 0x7f,
-	.odt_en = 0,
-	.size = 2048,
-	.tpr0 = 0x42d899b7,
-	.tpr1 = 0xa090,
-	.tpr2 = 0x22a00,
-	.tpr3 = 0x0,
-	.tpr4 = 0x1,
-	.tpr5 = 0x0,
-	.emr1 = 0x4,
-	.emr2 = 0x10,
-	.emr3 = 0x0,
+static struct dram_para dram_para = { /* DRAM timings: 9-8-8-22 (600 MHz) */
+	.clock            = 600,
+	.mbus_clock       = 400,
+	.type             = 3,
+	.rank_num         = 1,
+	.density          = 4096,
+	.io_width         = 8,
+	.bus_width        = 32,
+	.cas              = 9,
+	.zq               = 0x2c,
+	.odt_en           = 3,
+	.tpr0             = 0x3c9688b4,
+	.tpr1             = 0xa090,
+	.tpr2             = 0x2be00,
+	.tpr3             = 0x021111,
+	.tpr4             = 0x1,
+	.tpr5             = 0x0,
+	.emr1             = 0x42,
+	.emr2             = 0x10,
+	.emr3             = 0x0,
+	.dqs_gating_delay = 0x07070707,
+	.active_windowing = 1,
 };
 
 unsigned long sunxi_dram_init(void)
