@@ -17,6 +17,13 @@
 #define CONFIG_SYS_PROMPT		"sun7i# "
 #define CONFIG_MACH_TYPE		4283
 
+#define CONFIG_ARMV7_VIRT		1
+#define CONFIG_ARMV7_NONSEC		1
+#define CONFIG_ARMV7_PSCI		1
+#define CONFIG_ARMV7_PSCI_NR_CPUS	2
+#define CONFIG_ARMV7_SECURE_BASE	SUNXI_SRAM_B_BASE
+#define CONFIG_SYS_CLK_FREQ		24000000
+
 /*
  * Include common sunxi configuration where most the settings are
  */
