@@ -105,6 +105,10 @@
 #define SUNXI_MP_BASE			0x01e80000
 #define SUNXI_AVG_BASE			0x01ea0000
 
+#define IS_SUN4I() 			(*(u8 *)(SUNXI_SRAMC_BASE + 0x26) == 0x23)
+#define IS_SUN5I() 			(*(u8 *)(SUNXI_SRAMC_BASE + 0x26) == 0x25)
+#define IS_SUN7I() 			(*(u8 *)(SUNXI_SRAMC_BASE + 0x26) == 0x51)
+
 /* CoreSight Debug Module */
 #define SUNXI_CSDM_BASE			0x3f500000
 

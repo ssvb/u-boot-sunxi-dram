@@ -13,6 +13,8 @@
 #ifndef _SUNXI_COMMON_CONFIG_H
 #define _SUNXI_COMMON_CONFIG_H
 
+#define CONFIG_MACH_TYPE		(IS_SUN7I() ? 4283 : (IS_SUN4I() ? 4104 : 4138))
+
 /*
  * High Level Configuration Options
  */
