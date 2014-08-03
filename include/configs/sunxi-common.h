@@ -13,6 +13,18 @@
 #ifndef _SUNXI_COMMON_CONFIG_H
 #define _SUNXI_COMMON_CONFIG_H
 
+#ifndef SOC_IS_SUN4I
+#define SOC_IS_SUN4I() 0
+#endif
+
+#ifndef SOC_IS_SUN5I
+#define SOC_IS_SUN5I() 0
+#endif
+
+#ifndef SOC_IS_SUN7I
+#define SOC_IS_SUN7I() 0
+#endif
+
 /*
  * High Level Configuration Options
  */

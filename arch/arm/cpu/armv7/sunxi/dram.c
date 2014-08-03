@@ -74,22 +74,23 @@ static void mctl_ddr3_reset(void)
 	struct sunxi_dram_reg *dram =
 			(struct sunxi_dram_reg *)SUNXI_DRAMC_BASE;
 
-#ifdef CONFIG_SUN4I
 	struct sunxi_timer_reg *timer =
 			(struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
 	u32 reg_val;
+	int reset_done = 0;
 
-	writel(0, &timer->cpu_cfg);
-	reg_val = readl(&timer->cpu_cfg);
-
-	if ((reg_val & CPU_CFG_CHIP_VER_MASK) !=
-	    CPU_CFG_CHIP_VER(CPU_CFG_CHIP_REV_A)) {
-		setbits_le32(&dram->mcr, DRAM_MCR_RESET);
-		udelay(200);
-		clrbits_le32(&dram->mcr, DRAM_MCR_RESET);
-	} else
-#endif
-	{
+	if (SOC_IS_SUN4I()) {
+		writel(0, &timer->cpu_cfg);
+		reg_val = readl(&timer->cpu_cfg);
+		if ((reg_val & CPU_CFG_CHIP_VER_MASK) !=
+		    CPU_CFG_CHIP_VER(CPU_CFG_CHIP_REV_A)) {
+			setbits_le32(&dram->mcr, DRAM_MCR_RESET);
+			udelay(200);
+			clrbits_le32(&dram->mcr, DRAM_MCR_RESET);
+			reset_done = 1;
+		}
+	}
+	if (!reset_done) {
 		clrbits_le32(&dram->mcr, DRAM_MCR_RESET);
 		udelay(200);
 		setbits_le32(&dram->mcr, DRAM_MCR_RESET);
@@ -112,14 +113,10 @@ static void mctl_ddr3_reset(void)
 static void mctl_set_drive(void)
 {
 	struct sunxi_dram_reg *dram = (struct sunxi_dram_reg *)SUNXI_DRAMC_BASE;
-
-#ifdef CONFIG_SUN7I
-	clrsetbits_le32(&dram->mcr, DRAM_MCR_MODE_NORM(0x3) | (0x3 << 28),
-#else
-	clrsetbits_le32(&dram->mcr, DRAM_MCR_MODE_NORM(0x3),
-#endif
-			DRAM_MCR_MODE_EN(0x3) |
-			0xffc);
+	clrsetbits_le32(&dram->mcr,
+			DRAM_MCR_MODE_NORM(0x3) |
+					(SOC_IS_SUN7I() ? (0x3 << 28) : 0),
+			DRAM_MCR_MODE_EN(0x3) | 0xffc);
 }
 
 static void mctl_itm_disable(void)
@@ -201,8 +198,7 @@ static void mctl_enable_dllx(u32 phase)
 	udelay(22);
 }
 
-static u32 hpcr_value[32] = {
-#ifdef CONFIG_SUN5I
+static u32 hpcr_value_sun5i[32] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
@@ -211,8 +207,9 @@ static u32 hpcr_value[32] = {
 	0x1035, 0x0731, 0x1031, 0,
 	0x0301, 0x0301, 0x0301, 0x0301,
 	0x0301, 0x0301, 0x0301, 0
-#endif
-#ifdef CONFIG_SUN4I
+};
+
+static u32 hpcr_value_sun4i[32] = {
 	0x0301, 0x0301, 0x0301, 0x0301,
 	0x0301, 0x0301, 0, 0,
 	0, 0, 0, 0,
@@ -221,8 +218,9 @@ static u32 hpcr_value[32] = {
 	0x1035, 0x0731, 0x1031, 0x0735,
 	0x1035, 0x1031, 0x0731, 0x1035,
 	0x1031, 0x0301, 0x0301, 0x0731
-#endif
-#ifdef CONFIG_SUN7I
+};
+
+static u32 hpcr_value_sun7i[32] = {
 	0x0301, 0x0301, 0x0301, 0x0301,
 	0x0301, 0x0301, 0x0301, 0x0301,
 	0, 0, 0, 0,
@@ -236,13 +234,21 @@ static u32 hpcr_value[32] = {
 	 * but boot0 code skips #28 and #30, and sets #29 and #31 to the
 	 * value from #28 entry (0x1031)
 	 */
-#endif
 };
 
 static void mctl_configure_hostport(void)
 {
 	struct sunxi_dram_reg *dram = (struct sunxi_dram_reg *)SUNXI_DRAMC_BASE;
 	u32 i;
+	u32 *hpcr_value;
+	if (SOC_IS_SUN4I())
+		hpcr_value = hpcr_value_sun4i;
+	else if (SOC_IS_SUN5I())
+		hpcr_value = hpcr_value_sun5i;
+	else if (SOC_IS_SUN7I())
+		hpcr_value = hpcr_value_sun7i;
+	else
+		panic("Can't detect the SoC type");
 
 	for (i = 0; i < 32; i++)
 		writel(hpcr_value[i], &dram->hpcr[i]);
@@ -258,9 +264,8 @@ static void mctl_setup_dram_clock(u32 clk, u32 mbus_clk)
 	u32 pll6x_clk = clock_get_pll6() / 1000000;
 	u32 pll5p_clk = clk / 24 * 48;
 	u32 pll5p_rate, pll6x_rate;
-#ifdef CONFIG_SUN7I
-	pll6x_clk *= 2; /* sun7i uses PLL6*2, sun5i uses just PLL6 */
-#endif
+	if (SOC_IS_SUN7I())
+		pll6x_clk *= 2; /* sun7i uses PLL6*2, sun5i uses just PLL6 */
 
 	/* setup DRAM PLL */
 	reg_val = readl(&ccm->pll5_cfg);
@@ -311,13 +316,14 @@ static void mctl_setup_dram_clock(u32 clk, u32 mbus_clk)
 
 	setbits_le32(&ccm->pll5_cfg, CCM_PLL5_CTRL_DDR_CLK);
 
-#if defined(CONFIG_SUN4I) || defined(CONFIG_SUN7I)
-	/* reset GPS */
-	clrbits_le32(&ccm->gps_clk_cfg, CCM_GPS_CTRL_RESET | CCM_GPS_CTRL_GATE);
-	setbits_le32(&ccm->ahb_gate0, CCM_AHB_GATE_GPS);
-	udelay(1);
-	clrbits_le32(&ccm->ahb_gate0, CCM_AHB_GATE_GPS);
-#endif
+	if (SOC_IS_SUN4I() || SOC_IS_SUN7I()) {
+		/* reset GPS */
+		clrbits_le32(&ccm->gps_clk_cfg,
+			     CCM_GPS_CTRL_RESET | CCM_GPS_CTRL_GATE);
+		setbits_le32(&ccm->ahb_gate0, CCM_AHB_GATE_GPS);
+		udelay(1);
+		clrbits_le32(&ccm->ahb_gate0, CCM_AHB_GATE_GPS);
+	}
 
 	/* setup MBUS clock */
 	if (!mbus_clk)
@@ -348,19 +354,15 @@ static void mctl_setup_dram_clock(u32 clk, u32 mbus_clk)
 	 * open DRAMC AHB & DLL register clock
 	 * close it first
 	 */
-#if defined(CONFIG_SUN5I) || defined(CONFIG_SUN7I)
-	clrbits_le32(&ccm->ahb_gate0, CCM_AHB_GATE_SDRAM | CCM_AHB_GATE_DLL);
-#else
-	clrbits_le32(&ccm->ahb_gate0, CCM_AHB_GATE_SDRAM);
-#endif
+	clrbits_le32(&ccm->ahb_gate0, CCM_AHB_GATE_SDRAM |
+		((SOC_IS_SUN5I() || SOC_IS_SUN7I()) ? CCM_AHB_GATE_DLL : 0));
+
 	udelay(22);
 
 	/* then open it */
-#if defined(CONFIG_SUN5I) || defined(CONFIG_SUN7I)
-	setbits_le32(&ccm->ahb_gate0, CCM_AHB_GATE_SDRAM | CCM_AHB_GATE_DLL);
-#else
-	setbits_le32(&ccm->ahb_gate0, CCM_AHB_GATE_SDRAM);
-#endif
+	setbits_le32(&ccm->ahb_gate0, CCM_AHB_GATE_SDRAM |
+		((SOC_IS_SUN5I() || SOC_IS_SUN7I()) ? CCM_AHB_GATE_DLL : 0));
+
 	udelay(22);
 }
 
@@ -417,21 +419,23 @@ static int dramc_scan_readpipe(void)
 
 static void dramc_clock_output_en(u32 on)
 {
-#if defined(CONFIG_SUN5I) || defined(CONFIG_SUN7I)
 	struct sunxi_dram_reg *dram = (struct sunxi_dram_reg *)SUNXI_DRAMC_BASE;
-
-	if (on)
-		setbits_le32(&dram->mcr, DRAM_MCR_DCLK_OUT);
-	else
-		clrbits_le32(&dram->mcr, DRAM_MCR_DCLK_OUT);
-#endif
-#ifdef CONFIG_SUN4I
 	struct sunxi_ccm_reg *ccm = (struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
-	if (on)
-		setbits_le32(&ccm->dram_clk_cfg, CCM_DRAM_CTRL_DCLK_OUT);
-	else
-		clrbits_le32(&ccm->dram_clk_cfg, CCM_DRAM_CTRL_DCLK_OUT);
-#endif
+
+	if (SOC_IS_SUN5I() || SOC_IS_SUN7I()) {
+		if (on)
+			setbits_le32(&dram->mcr, DRAM_MCR_DCLK_OUT);
+		else
+			clrbits_le32(&dram->mcr, DRAM_MCR_DCLK_OUT);
+	}
+	if (SOC_IS_SUN4I()) {
+		if (on)
+			setbits_le32(&ccm->dram_clk_cfg,
+				     CCM_DRAM_CTRL_DCLK_OUT);
+		else
+			clrbits_le32(&ccm->dram_clk_cfg,
+				     CCM_DRAM_CTRL_DCLK_OUT);
+	}
 }
 
 /* tRFC in nanoseconds for different densities (from the DDR3 spec) */
@@ -527,27 +531,25 @@ static void mctl_set_impedance(u32 zq, u32 odt_en)
 	u32 reg_val;
 	u32 zprog = zq & 0xFF, zdata = (zq >> 8) & 0xFFFFF;
 
-#ifndef CONFIG_SUN7I
 	/* Appears that some kind of automatically initiated default
 	 * ZQ calibration is already in progress at this point on sun4i/sun5i
 	 * hardware, but not on sun7i. So it is reasonable to wait for its
 	 * completion before doing anything else. */
-	await_bits_set(&dram->zqsr, DRAM_ZQSR_ZDONE);
-#endif
+	if (!SOC_IS_SUN7I())
+		await_bits_set(&dram->zqsr, DRAM_ZQSR_ZDONE);
 
 	/* ZQ calibration is not really useful unless ODT is enabled */
 	if (!odt_en)
 		return;
 
-#ifdef CONFIG_SUN7I
 	/* Enabling ODT in SDR_IOCR on sun7i hardware results in a deadlock
 	 * unless bit 24 is set in SDR_ZQCR1. Not much is known about the
 	 * SDR_ZQCR1 register, but there are hints indicating that it might
 	 * be related to periodic impedance re-calibration. This particular
 	 * magic value is borrowed from the Allwinner boot0 bootloader, and
 	 * using it helps to avoid troubles */
-	writel((1 << 24) | (1 << 1), &dram->zqcr1);
-#endif
+	if (SOC_IS_SUN7I())
+		writel((1 << 24) | (1 << 1), &dram->zqcr1);
 
 	/* Needed at least for sun5i, because it does not self clear there */
 	clrbits_le32(&dram->zqcr0, DRAM_ZQCR0_ZCAL);
@@ -597,10 +599,10 @@ static unsigned long dramc_init_helper(struct dram_para *para)
 	/* dram clock off */
 	dramc_clock_output_en(0);
 
-#ifdef CONFIG_SUN4I
-	/* select dram controller 1 */
-	writel(DRAM_CSEL_MAGIC, &dram->csel);
-#endif
+	if (SOC_IS_SUN4I()) {
+		/* select dram controller 1 */
+		writel(DRAM_CSEL_MAGIC, &dram->csel);
+	}
 
 	mctl_itm_disable();
 	mctl_enable_dll0(para->tpr3);
@@ -654,9 +656,8 @@ static unsigned long dramc_init_helper(struct dram_para *para)
 	writel(para->tpr2, &dram->tpr2);
 
 	reg_val = DRAM_MR_BURST_LENGTH(0x0);
-#if (defined(CONFIG_SUN5I) || defined(CONFIG_SUN7I))
-	reg_val |= DRAM_MR_POWER_DOWN;
-#endif
+	if (SOC_IS_SUN5I() || SOC_IS_SUN7I())
+		reg_val |= DRAM_MR_POWER_DOWN;
 	reg_val |= DRAM_MR_CAS_LAT(para->cas - 4);
 	reg_val |= DRAM_MR_WRITE_RECOVERY(ddr3_write_recovery(para->clock));
 	writel(reg_val, &dram->mr);
@@ -668,11 +669,10 @@ static unsigned long dramc_init_helper(struct dram_para *para)
 	/* disable drift compensation and set passive DQS window mode */
 	clrsetbits_le32(&dram->ccr, DRAM_CCR_DQS_DRIFT_COMP, DRAM_CCR_DQS_GATE);
 
-#ifdef CONFIG_SUN7I
 	/* Command rate timing mode 2T & 1T */
-	if (para->tpr4 & 0x1)
+	if (SOC_IS_SUN7I() && (para->tpr4 & 0x1))
 		setbits_le32(&dram->ccr, DRAM_CCR_COMMAND_RATE_1T);
-#endif
+
 	/* initialize external DRAM */
 	mctl_ddr3_initialize();
 
@@ -718,13 +718,16 @@ unsigned long dramc_init(struct dram_para *para)
 	/* try to autodetect the DRAM bus width and density */
 	para->io_width  = 16;
 	para->bus_width = 32;
-#if defined(CONFIG_SUN4I) || defined(CONFIG_SUN5I)
-	/* only A0-A14 address lines on A10/A13, limiting max density to 4096 */
-	para->density = 4096;
-#else
-	/* all A0-A15 address lines on A20, which allow density 8192 */
-	para->density = 8192;
-#endif
+
+	if (SOC_IS_SUN4I() || SOC_IS_SUN5I()) {
+		/* only A0-A14 address lines on A10/A13,
+		 * limiting max density to 4096 */
+		para->density = 4096;
+	} else {
+		/* all A0-A15 address lines on A20,
+		 * which allow density 8192 */
+		para->density = 8192;
+	}
 
 	dram_size = dramc_init_helper(para);
 	if (!dram_size) {

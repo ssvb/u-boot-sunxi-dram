@@ -15,6 +15,8 @@
 #define CONFIG_SUN7I		/* sun7i SoC generation */
 #define CONFIG_CLK_FULL_SPEED		912000000
 
+#define SOC_IS_SUN7I() 1
+
 #define CONFIG_SYS_PROMPT		"sun7i# "
 
 #ifdef CONFIG_USB_EHCI

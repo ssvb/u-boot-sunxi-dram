@@ -14,6 +14,8 @@
 #define CONFIG_SUN4I		/* sun4i SoC generation */
 #define CONFIG_CLK_FULL_SPEED		1008000000
 
+#define SOC_IS_SUN4I() 1
+
 #define CONFIG_SYS_PROMPT		"sun4i# "
 
 #ifdef CONFIG_USB_EHCI
