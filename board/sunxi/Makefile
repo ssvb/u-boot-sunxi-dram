@@ -11,6 +11,7 @@
 obj-y	+= board.o
 obj-$(CONFIG_SUNXI_GMAC)	+= gmac.o
 obj-$(CONFIG_SUNXI_AHCI)	+= ahci.o
+obj-$(CONFIG_SUNXI_GENERIC_A10_A13_A20) += dram_sunxi_ddr3_failsafe.o
 obj-$(CONFIG_A10_OLINUXINO_L)	+= dram_a10_olinuxino_l.o
 obj-$(CONFIG_A10S_OLINUXINO_M)	+= dram_a10s_olinuxino_m.o
 obj-$(CONFIG_A13_OLINUXINO)	+= dram_a13_olinuxino.o

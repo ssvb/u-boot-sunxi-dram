@@ -9,6 +9,7 @@
 #include <common.h>
 #include <asm/io.h>
 #include <asm/arch/cpu.h>
+#include <asm/arch/sys_proto.h>
 
 #ifdef CONFIG_DISPLAY_CPUINFO
 int print_cpuinfo(void)

@@ -32,3 +32,10 @@ F:	configs/Cubieboard2_defconfig
 F:	configs/Cubieboard2_FEL_defconfig
 F:	configs/Cubietruck_defconfig
 F:	configs/Cubietruck_FEL_defconfig
+
+SUNXI GENERIC
+M:	Siarhei Siamashka <siarhei.siamashka@gmail.com>
+S:	Maintained
+F:	include/configs/sun4i_sun5i_sun7i.h
+F:	configs/sunxi-generic-a10-a13-a20_defconfig
+F:	configs/sunxi-generic-a10-a13-a20_FEL_defconfig

@@ -48,17 +48,62 @@ u32 spl_boot_mode(void)
 }
 #endif
 
+static void sunxi_soc_detect_init(void)
+{
+	/* Enable VER_REG (set the VER_R_EN bit) */
+	setbits_le32((u32 *)(SUNXI_SRAMC_BASE + 0x24), 1 << 15);
+}
+
+int soc_is_sun4i(void)
+{
+	return (readl((u32 *)(SUNXI_SRAMC_BASE + 0x24)) >> 16) == 0x1623;
+}
+
+int soc_is_sun5i(void)
+{
+	return (readl((u32 *)(SUNXI_SRAMC_BASE + 0x24)) >> 16) == 0x1625;
+}
+
+int soc_is_sun7i(void)
+{
+	return (readl((u32 *)(SUNXI_SRAMC_BASE + 0x24)) >> 16) == 0x1651;
+}
+
+int sunxi_cons_index(void)
+{
+	int cons_index = CONFIG_CONS_INDEX;
+
+	if (cons_index == 1 && SOC_IS_SUN5I()) {
+		u32 val = readl(SUNXI_SID_BASE + 0x08);
+		if (((val >> 12) & 0xf) == 3) {
+			/* Allwinner A13 */
+			cons_index = 2;
+		}
+	}
+	return cons_index;
+}
+
+struct serial_device *default_serial_console(void)
+{
+	if (sunxi_cons_index() == 1)
+		return &eserial1_device;
+	else
+		return &eserial2_device;
+}
+
 int gpio_init(void)
 {
-	if (CONFIG_CONS_INDEX == 1 && (SOC_IS_SUN4I() || SOC_IS_SUN7I())) {
+	int cons_index = sunxi_cons_index();
+
+	if (cons_index == 1 && (SOC_IS_SUN4I() || SOC_IS_SUN7I())) {
 		sunxi_gpio_set_cfgpin(SUNXI_GPB(22), SUN4I_GPB22_UART0_TX);
 		sunxi_gpio_set_cfgpin(SUNXI_GPB(23), SUN4I_GPB23_UART0_RX);
 		sunxi_gpio_set_pull(SUNXI_GPB(23), 1);
-	} else if (CONFIG_CONS_INDEX == 1 && SOC_IS_SUN5I()) {
+	} else if (cons_index == 1 && SOC_IS_SUN5I()) {
 		sunxi_gpio_set_cfgpin(SUNXI_GPB(19), SUN5I_GPB19_UART0_TX);
 		sunxi_gpio_set_cfgpin(SUNXI_GPB(20), SUN5I_GPB20_UART0_RX);
 		sunxi_gpio_set_pull(SUNXI_GPB(20), 1);
-	} else if (CONFIG_CONS_INDEX == 2 && SOC_IS_SUN5I()) {
+	} else if (cons_index == 2 && SOC_IS_SUN5I()) {
 		sunxi_gpio_set_cfgpin(SUNXI_GPG(3), SUN5I_GPG3_UART1_TX);
 		sunxi_gpio_set_cfgpin(SUNXI_GPG(4), SUN5I_GPG4_UART1_RX);
 		sunxi_gpio_set_pull(SUNXI_GPG(4), 1);
@@ -88,6 +133,7 @@ void reset_cpu(ulong addr)
 /* do some early init */
 void s_init(void)
 {
+	sunxi_soc_detect_init();
 #if !defined CONFIG_SPL_BUILD
 	int soc_is_sun6i = 0;
 #ifdef CONFIG_SUN6I
