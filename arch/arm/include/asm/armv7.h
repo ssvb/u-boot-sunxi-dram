@@ -8,6 +8,10 @@
 #ifndef ARMV7_H
 #define ARMV7_H
 
+/* Cortex-A8 revisions */
+#define MIDR_CORTEX_A8_PRIMARY_PART	0x410FC080
+#define MIDR_CORTEX_A8_R3P2		0x413FC082
+
 /* Cortex-A9 revisions */
 #define MIDR_CORTEX_A9_R0P1	0x410FC091
 #define MIDR_CORTEX_A9_R1P2	0x411FC092
@@ -80,6 +84,7 @@ void v7_outer_cache_inval_range(u32 start, u32 end);
 
 int armv7_init_nonsec(void);
 int armv7_update_dt(void *fdt);
+int armv7_is_cpu_blacklisted_for_nonsec(void);
 
 /* defined in assembly file */
 unsigned int _nonsec_init(void);
