@@ -71,10 +71,30 @@ void __weak smp_kick_all_cpus(void)
 	kick_secondary_cpus_gic(gic_dist_addr);
 }
 
+/*
+ * Check the "black list" of CPUs, which are not supported by this code
+ */
+int armv7_is_cpu_blacklisted_for_nonsec(void)
+{
+	unsigned midr;
+	asm("mrc p15, 0, %0, c0, c0, 0\n" : "=r"(midr));
+
+	/* Cortex-A8 is not supported yet */
+	if ((midr & MIDR_PRIMARY_PART_MASK) == MIDR_CORTEX_A8_PRIMARY_PART)
+		return 1;
+
+	return 0;
+}
+
 int armv7_init_nonsec(void)
 {
 	unsigned int reg;
 	unsigned itlinesnr, i;
+
+	if (armv7_is_cpu_blacklisted_for_nonsec()) {
+		printf("nonsec: This CPU is not supported.\n");
+		return -1;
+	}
 
 	/* check whether the CPU supports the security extensions */
 	reg = read_id_pfr1();

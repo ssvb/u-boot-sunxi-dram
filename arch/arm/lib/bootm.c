@@ -281,9 +281,19 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 
 	if (!fake) {
 #if defined(CONFIG_ARMV7_NONSEC) || defined(CONFIG_ARMV7_VIRT)
-		armv7_init_nonsec();
-		secure_ram_addr(_do_nonsec_entry)(kernel_entry,
-						  0, machid, r2);
+		if (armv7_init_nonsec()) {
+			printf("Switch to non-secure mode has failed - ");
+#ifdef CONFIG_ARMV7_ALLOW_SECURE_MODE_FALLBACK
+			printf("booting the kernel in secure mode ...\n\n");
+			kernel_entry(0, machid, r2);
+#else
+			printf("hanging ...\n");
+			hang();
+#endif
+		} else {
+			secure_ram_addr(_do_nonsec_entry)(kernel_entry,
+							  0, machid, r2);
+		}
 #else
 		kernel_entry(0, machid, r2);
 #endif

@@ -31,6 +31,9 @@ static int fdt_psci(void *fdt)
 	int nodeoff;
 	int tmp;
 
+	if (armv7_is_cpu_blacklisted_for_nonsec())
+		return 0;
+
 	nodeoff = fdt_path_offset(fdt, "/cpus");
 	if (nodeoff < 0) {
 		printf("couldn't find /cpus\n");
