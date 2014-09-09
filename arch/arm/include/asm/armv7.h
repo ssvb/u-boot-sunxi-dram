@@ -83,6 +83,7 @@ void v7_outer_cache_inval_range(u32 start, u32 end);
 #if defined(CONFIG_ARMV7_NONSEC) || defined(CONFIG_ARMV7_VIRT)
 
 int armv7_init_nonsec(void);
+void armv7_have_dt(void);
 int armv7_update_dt(void *fdt);
 int armv7_is_cpu_blacklisted_for_nonsec(void);
 

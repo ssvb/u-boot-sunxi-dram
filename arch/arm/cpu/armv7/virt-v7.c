@@ -86,10 +86,23 @@ int armv7_is_cpu_blacklisted_for_nonsec(void)
 	return 0;
 }
 
+static int have_dt = 0;
+
+void armv7_have_dt(void)
+{
+	have_dt = 1;
+}
+
 int armv7_init_nonsec(void)
 {
 	unsigned int reg;
 	unsigned itlinesnr, i;
+
+	if (!have_dt) {
+		printf("nonsec: No DTB (using sunxi FEX?), so the ");
+		printf("non-secure mode is not desired.\n");
+		return -1;
+	}
 
 	if (armv7_is_cpu_blacklisted_for_nonsec()) {
 		printf("nonsec: This CPU is not supported.\n");
